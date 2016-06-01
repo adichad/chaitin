@@ -1,0 +1,88 @@
+apply plugin: 'scala'
+apply plugin: 'maven'
+apply plugin: 'eclipse'
+
+apply from: 'gradle.properties'
+
+defaultTasks 'go'
+
+eclipse {
+  jdt {
+    sourceCompatibility = 1.8
+    targetCompatibility = 1.8
+  }
+}
+
+ext {
+  scala_base_version = '2.11'
+  scala_version     = '2.11.7'
+
+}
+
+tasks.withType(ScalaCompile) {
+    // Use incremental compilation
+    scalaCompileOptions.useAnt = false
+    // Enable Scala warnings output
+    scalaCompileOptions.additionalParameters = ["-feature"]
+}
+
+compileScala {
+    // Enable Java warnings output
+    options.compilerArgs << "-Xlint:unchecked"
+}
+
+task go(dependsOn: ['compileJava', 'compileScala', 'build'], type: JavaExec) {
+  description = 'Start up ' + project.name
+
+  args = ['data/simplewiki.tsv']
+  classpath(sourceSets.main.runtimeClasspath, configurations.compile)
+
+  systemProperties = System.getProperties()
+  standardInput = System.in
+  if(System.getProperty('main')!=null) main = System.getProperty('main') else main = 'chaitin.Launcher'
+
+
+  jvmArgs+=['-Djava.library.path='+System.getProperty('java.library.path')]
+  jvmArgs+=['-Xmx2g']
+  jvmArgs+=['-Xms2g']
+}
+
+task dist(dependsOn: ['compileJava', 'compileScala', 'build'], type: Tar) {
+  def buildName=baseName+'-'+project.version
+
+  from(jar.outputs.files) {
+    into buildName+'/lib'
+  }
+  
+  from(configurations.runtime) {
+    into buildName+'/lib'
+  }
+  
+  from('src/main/scripts/linux') {
+    fileMode = 0755
+    into buildName+'/'
+  }
+
+  from('.') {
+    include 'README.md'
+    into buildName
+  }
+
+  compression = Compression.GZIP
+}
+
+
+dependencies {
+  compile     group: 'org.scala-lang',             name: "scala-library",                                     version: scala_version      // language libraries
+
+  testCompile group: 'org.scalatest',              name: "scalatest_${scala_base_version}",                   version: '2.2.6'            // testing framework
+  testCompile group: 'org.specs2',                 name: "specs2_${scala_base_version}",                      version: '3.7'              // testing
+  testCompile group: 'org.specs2',                 name: "specs2-core_${scala_base_version}",                 version: '3.7.2'            // testing
+  testCompile group: 'org.scalacheck',             name: "scalacheck_${scala_base_version}",                  version: '1.13.1'
+
+}
+
+repositories {
+  jcenter()
+  mavenCentral()
+}
